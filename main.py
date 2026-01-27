@@ -9,7 +9,7 @@ import hashlib
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_PATH = os.path.join(BASE_DIR, "ScienceTubeData")
 VIDEOS_DIR = os.path.join(STORAGE_PATH, "videos")
-DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v50.db")
+DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v80.db")
 
 if not os.path.exists(VIDEOS_DIR):
     os.makedirs(VIDEOS_DIR, exist_ok=True)
@@ -30,26 +30,29 @@ def hash_pass(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 # ==========================================
-# 🛡️ 2. نظام الرقابة الفولاذي (حظر كل ما ليس له علاقة بالعلم)
+# 🛡️ 2. نظام الرقابة الفولاذي المحدث (إضافة محظورات جديدة)
 # ==========================================
 BANNED_WORDS = [
-    # كرة قدم وأندية (مصر، المغرب، السعودية، عالمي)
+    # أندية ورياضة (توسيع النطاق)
     "الأهلي", "الزمالك", "الجيش الملكي", "الرجاء", "الوداد", "الهلال", "النصر", "الاتحاد", 
-    "ريال مدريد", "برشلونة", "ليفربول", "مانشستر", "مباراة", "ملخص", "أهداف", "هدف", "كورة", "كرة", 
-    "يتعادل", "يفوز", "خسارة", "دوري", "كأس", "بطولة", "منتخب", "كابتن", "مدرب", "لاعب",
-    # ترفيه وتريندات فارغة
-    "مقالب", "تحدي", "هبل", "ضحك", "مسخرة", "لعب", "جيمينج", "تيك توك", "بث مباشر", "لايف",
-    "فلوج", "يوميات", "فضيحة", "شاهد قبل الحذف", "مهرجان", "أغنية", "كليب", "فيلم", "مسلسل",
-    # سياسة وأخبار غير علمية
-    "سياسة", "عاجل", "خبر", "مظاهرات", "انتخابات", "رئيس", "وزير", "شتيمة", "قذارة"
+    "ريال مدريد", "برشلونة", "ليفربول", "مانشستر", "بايرن", "مباراة", "ملخص", "أهداف", 
+    "هدف", "كورة", "كرة", "يتعادل", "يفوز", "خسارة", "دوري", "كأس", "بطولة", "منتخب", 
+    "لاعب", "كابتن", "ضربة جزاء", "حكم", "نادي", "المونديال",
+    # مشاهير وتريندات وترفيه
+    "مقالب", "تحدي", "هبل", "ضحك", "مسخرة", "لعب", "جيمينج", "تيك توك", "بث مباشر", 
+    "لايف", "فلوج", "يوميات", "فضيحة", "شاهد قبل الحذف", "مهرجان", "أغنية", "كليب", 
+    "فيلم", "مسلسل", "تريند", "بوجي", "تامر", "شيرين", "نمبر وان", "اكتساح",
+    # محتوى غير لائق أو غير علمي
+    "سياسة", "عاجل", "خبر", "مظاهرات", "انتخابات", "رئيس", "وزير", "شتيمة", "قذارة", 
+    "هياط", "خناقة", "ضرب", "دم", "رعب"
 ]
 
 def is_scientific(title):
     t = title.strip().lower()
-    # 1. فحص الكلمات المحظورة
+    # 1. منع الكلمات المحظورة
     if any(word in t for word in BANNED_WORDS):
         return False
-    # 2. التأكد من جدية العنوان (لا يقل عن 10 حروف)
+    # 2. منع العناوين القصيرة جداً (أقل من 10 حروف غالباً ما تكون غير جادة)
     if len(t) < 10:
         return False
     return True
@@ -87,12 +90,12 @@ if 'user' not in st.session_state: st.session_state.user = "زائر"
 if 'page' not in st.session_state: st.session_state.page = 'home'
 
 # أزرار التنقل
-c1, c2 = st.columns([5, 1])
-with c1:
-    if st.button("🏠 الرئيسية", key="h_btn"): st.session_state.page = 'home'; st.rerun()
-with c2:
+c_n1, c_n2 = st.columns([5, 1])
+with c_n1:
+    if st.button("🏠 الرئيسية", key="top_h"): st.session_state.page = 'home'; st.rerun()
+with c_n2:
     label = f"🚀 {st.session_state.user}" if st.session_state.logged_in else "👤 منطقة الناشرين"
-    if st.button(label, use_container_width=True, key="p_btn"): st.session_state.page = 'publisher_area'; st.rerun()
+    if st.button(label, use_container_width=True, key="top_p"): st.session_state.page = 'publisher_area'; st.rerun()
 
 st.divider()
 
@@ -101,85 +104,89 @@ st.divider()
 # ==========================================
 with st.sidebar:
     st.title("🧭 التنقل")
-    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"], key="s_nav")
-    selected_cat = st.radio("📂 الأقسام العلمية:", all_cats, key="s_cats")
+    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"], key="sb_nav")
+    selected_cat = st.radio("📂 الأقسام العلمية:", all_cats, key="sb_cats")
 
 # ==========================================
 # 🏠 5. الصفحة الرئيسية
 # ==========================================
 if st.session_state.page == 'home':
     if sub_nav == "🏠 الفيديوهات":
-        search_q = st.text_input("🔍 ابحث عن فيديو علمي...", "", key="search_input")
-
+        search_q = st.text_input("🔍 ابحث عن فيديو علمي...", "", key="search_bar")
         sql = "SELECT * FROM videos WHERE 1=1"
         params = []
         if selected_cat != "الكل":
-            sql += " AND category=?"
-            params.append(selected_cat)
+            sql += " AND category=?"; params.append(selected_cat)
         if search_q:
-            sql += " AND title LIKE ?"
-            params.append(f"%{search_q}%")
+            sql += " AND title LIKE ?"; params.append(f"%{search_q}%")
         
         vids = conn.execute(sql + " ORDER BY id DESC", tuple(params)).fetchall()
 
         if not vids:
-            if search_q:
-                st.warning("عذراً، لم يتم العثور على أي محتوى يطابق بحثك..")
-            else:
-                st.info("لا يوجد محتوى علمي متاح حالياً في هذا القسم..")
+            if search_q: st.warning("عذراً، لم يتم العثور على أي محتوى يطابق بحثك..")
+            else: st.info("لا يوجد محتوى علمي متاح حالياً في هذا القسم..")
         else:
             for v in vids:
                 with st.container(border=True):
-                    st.subheader(v[1])
-                    st.video(v[2])
+                    st.subheader(v[1]); st.video(v[2])
                     st.write(f"👁️ {v[6]} | ✍️ {v[3]} | 📂 {v[4]}")
-                    col_b1, col_b2, col_b3 = st.columns(3)
-                    if col_b1.button("📚 حفظ", key=f"sv_{v[0]}"):
+                    c1, c2, c3 = st.columns(3)
+                    if c1.button("📚 حفظ", key=f"s_{v[0]}"):
                         if v[0] not in st.session_state.my_library:
                             st.session_state.my_library.append(v[0]); st.success("تم الحفظ!")
-                    if col_b3.button(f"❤️ {v[5]}", key=f"lk_{v[0]}"):
-                        conn.execute("UPDATE videos SET likes = likes + 1 WHERE id = ?", (v[0],))
+                    if c3.button(f"❤️ {v[5]}", key=f"l_{v[0]}"):
+                        conn.execute("UPDATE videos SET likes=likes+1 WHERE id=?", (v[0],))
                         conn.commit(); st.rerun()
 
 # ==========================================
-# 📊 6. منطقة الناشرين (الفحص والنشر)
+# 📊 6. منطقة الناشرين (دخول / استعادة / فحص ونشر)
 # ==========================================
 elif st.session_state.page == 'publisher_area':
     if not st.session_state.logged_in:
-        tabs = st.tabs(["🔑 دخول", "📝 تسجيل"])
-        with tabs[0]:
+        t = st.tabs(["🔑 دخول", "📝 تسجيل", "🔐 استعادة"])
+        with t[0]:
             u = st.text_input("اسم المستخدم", key="l_u")
             p = st.text_input("كلمة المرور", type="password", key="l_p")
-            if st.button("دخول", key="l_btn"):
+            if st.button("دخول", key="l_b"):
                 res = conn.execute("SELECT * FROM users WHERE username=? AND password=?", (u, hash_pass(p))).fetchone()
-                if res: st.session_state.logged_in = True; st.session_state.user = u; st.rerun()
+                if res: st.session_state.logged_in=True; st.session_state.user=u; st.rerun()
                 else: st.error("خطأ!")
-        with tabs[1]:
-            ru = st.text_input("اسم جديد", key="r_u")
-            rp = st.text_input("باسورد جديد", type="password", key="r_p")
-            if st.button("تسجيل", key="r_btn"):
+        with t[1]:
+            ru = st.text_input("اسم مستخدم جديد", key="r_u")
+            rp = st.text_input("كلمة سر جديدة", type="password", key="r_p")
+            if st.button("تسجيل", key="r_b"):
                 try:
                     conn.execute("INSERT INTO users VALUES (?,?)", (ru, hash_pass(rp)))
                     conn.commit(); st.success("تم!")
                 except: st.error("مكرر!")
+        with t[2]:
+            fu = st.text_input("الاسم للاستعادة", key="f_u")
+            if fu:
+                check = conn.execute("SELECT username FROM users WHERE username=?", (fu,)).fetchone()
+                if check:
+                    np = st.text_input("باسورد جديد", type="password", key="f_p")
+                    if st.button("تحديث", key="f_b"):
+                        conn.execute("UPDATE users SET password=? WHERE username=?", (hash_pass(np), fu))
+                        conn.commit(); st.success("تم التحديث!")
+                else: st.warning("غير موجود")
     else:
         st.subheader(f"لوحة التحكم: {st.session_state.user}")
-        if st.button("🚪 خروج", key="logout"): st.session_state.logged_in = False; st.rerun()
+        if st.button("🚪 خروج", key="logout"): st.session_state.logged_in=False; st.rerun()
         st.divider()
-        vt = st.text_input("عنوان الفيديو العلمي", key="up_title")
-        vc = st.selectbox("القسم", all_cats[1:], key="up_cat")
-        vf = st.file_uploader("ارفع الفيديو", type=["mp4"], key="up_file")
+        vt = st.text_input("عنوان الفيديو العلمي", key="v_t")
+        vc = st.selectbox("القسم", all_cats[1:], key="v_c")
+        vf = st.file_uploader("ارفع MP4", type=["mp4"], key="v_f")
         
-        # الزر مع نظام الرقابة الصارم الجديد
-        if st.button("فحص ونشر الفيديو", key="up_btn"):
+        # الزر المطلوب مع نظام الرقابة الشامل
+        if st.button("فحص ونشر الفيديو", key="v_pub"):
             if vt and vf:
                 if not is_scientific(vt):
-                    st.error("⚠️ السيستم رفض العنوان! المحتوى رياضي أو ترفيهي أو غير لائق علمياً.")
+                    st.error("⚠️ السيستم رفض العنوان! المحتوى رياضي، ترفيهي أو غير علمي.")
                 else:
                     try:
                         path = os.path.join(VIDEOS_DIR, vf.name)
                         with open(path, "wb") as f: f.write(vf.getbuffer())
                         conn.execute("INSERT INTO videos (title, path, author, category) VALUES (?,?,?,?)", (vt, path, st.session_state.user, vc))
                         conn.commit(); st.success("✅ تم الفحص والنشر بنجاح!")
-                    except: st.error("العنوان موجود مسبقاً!")
-                
+                    except: st.error("العنوان مكرر!")
+                    

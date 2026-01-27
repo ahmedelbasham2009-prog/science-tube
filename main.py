@@ -4,12 +4,12 @@ import os
 import hashlib
 
 # ==========================================
-# 💾 1. إعدادات المسارات وقاعدة البيانات
+# 💾 1. إعدادات المسارات الديناميكية
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_PATH = os.path.join(BASE_DIR, "ScienceTubeData")
 VIDEOS_DIR = os.path.join(STORAGE_PATH, "videos")
-DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v25.db") # تحديث الإصدار لضمان النقاء
+DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v30.db")
 
 if not os.path.exists(VIDEOS_DIR):
     os.makedirs(VIDEOS_DIR, exist_ok=True)
@@ -30,16 +30,16 @@ def hash_pass(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 # ==========================================
-# 🛡️ 2. الرقابة الصارمة
+# 🛡️ 2. نظام الرقابة الصارم (العلمي)
 # ==========================================
-BANNED_WORDS = ["هبل", "مقالب", "تحدي", "سياسة", "شتيمة", "قذارة", "لعب", "مسخرة"]
+BANNED_WORDS = ["هبل", "مقالب", "تحدي", "سياسة", "شتيمة", "قذارة", "لعب", "مسخرة", "تيك توك"]
 
 def is_scientific(title):
     t = title.lower()
     return not any(word in t for word in BANNED_WORDS)
 
 # ==========================================
-# 🎨 3. التصميم (الميكروسكوب المركزي)
+# 🎨 3. التصميم والشعار (الميكروسكوب المركزي)
 # ==========================================
 st.set_page_config(page_title="Science Tube", page_icon="🔬", layout="wide")
 
@@ -63,44 +63,142 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# الأقسام الـ 23
-all_cats = ["الكل", "البرمجة", "علاج طبيعي", "الفيزياء التطبيقية", "الكيمياء", "الطب", "الفضاء", "الذكاء الاصطناعي", "الروبوتات", "الرياضيات", "الجيولوجيا", "علم النفس", "تكنولوجيا النانو", "الأحياء البحرية", "الهندسة", "علم الوراثة", "الأحافير", "الطاقة", "المناخ", "البرمجيات", "الإلكترونيات", "المنطق", "الكيمياء العضوية", "علوم الأعصاب"]
+all_cats = [
+    "الكل", "البرمجة", "علاج طبيعي", "الفيزياء التطبيقية", "الكيمياء", 
+    "الطب", "الفضاء", "الذكاء الاصطناعي", "الروبوتات", "الرياضيات", 
+    "الجيولوجيا", "علم النفس", "تكنولوجيا النانو", "الأحياء البحرية", 
+    "الهندسة", "علم الوراثة", "الأحافير", "الطاقة", "المناخ", 
+    "البرمجيات", "الإلكترونيات", "المنطق", "الكيمياء العضوية", "علوم الأعصاب"
+]
 
-# إدارة الحالة (Session State)
+# إدارة الجلسة
 if 'my_library' not in st.session_state: st.session_state.my_library = []
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user' not in st.session_state: st.session_state.user = "زائر"
 if 'page' not in st.session_state: st.session_state.page = 'home'
 
-# أزرار التنقل العلوي
-col_nav1, col_nav2 = st.columns([5, 1])
-with col_nav1:
-    if st.button("🏠 الرئيسية", key="btn_go_home"):
+# أزرار التنقل العلوي مع مفاتيح فريدة
+c_nav1, c_nav2 = st.columns([5, 1])
+with c_nav1:
+    if st.button("🏠 الرئيسية", key="top_nav_home"):
         st.session_state.page = 'home'
         st.rerun()
-with col_nav2:
+with c_nav2:
     label = f"🚀 {st.session_state.user}" if st.session_state.logged_in else "👤 منطقة الناشرين"
-    if st.button(label, use_container_width=True, key="btn_go_publisher"):
+    if st.button(label, use_container_width=True, key="top_nav_pub"):
         st.session_state.page = 'publisher_area'
         st.rerun()
 
 st.divider()
 
 # ==========================================
-# 🏠 4. القائمة الجانبية (Sidebar)
+# 🏠 4. القائمة الجانبية (الأقسام + مكتبتي)
 # ==========================================
 with st.sidebar:
     st.title("🧭 التنقل")
-    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي"], key="main_sidebar_radio")
-    selected_cat = st.radio("📂 الأقسام:", all_cats, key="cats_sidebar_radio")
+    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"], key="sidebar_radio_nav")
+    selected_cat = st.radio("📂 الأقسام العلمية:", all_cats, key="sidebar_radio_cats")
 
 # ==========================================
-# 🏠 5. عرض المحتوى والبحث
+# 🏠 5. المحتوى الرئيسي (البحث والعرض)
 # ==========================================
 if st.session_state.page == 'home':
     if sub_nav == "🏠 الفيديوهات":
-        # حل مشكلة الـ Duplicate ID بإعطاء Key فريد يعتمد على الصفحة
-        search_query = st.text_input("🔍 ابحث عن فيديو علمي...", "", key="search_input_global")
+        # حل مشكلة الـ Duplicate ID نهائياً باستخدام key فريد ومميز
+        search_query = st.text_input("🔍 ابحث عن فيديو علمي...", "", key="unique_home_search_input")
+
+        sql = "SELECT * FROM videos WHERE 1=1"
+        params = []
+        if selected_cat != "الكل":
+            sql += " AND category=?"
+            params.append(selected_cat)
+        if search_query:
+            sql += " AND title LIKE ?"
+            params.append(f"%{search_query}%")
+        
+        vids = conn.execute(sql + " ORDER BY id DESC", tuple(params)).fetchall()
+
+        if not vids:
+            st.info("لا توجد فيديوهات حالياً في هذا القسم أو تطابق بحثك.")
+
+        for v in vids:
+            with st.container(border=True):
+                st.subheader(v[1])
+                st.video(v[2])
+                st.write(f"👁️ {v[6]} | ✍️ {v[3]} | 📂 {v[4]}")
+                
+                c1, c2, c3 = st.columns(3)
+                if c1.button("📚 حفظ", key=f"save_btn_{v[0]}"):
+                    if v[0] not in st.session_state.my_library:
+                        st.session_state.my_library.append(v[0])
+                        st.success("تم الحفظ!")
+                
+                if c3.button(f"❤️ {v[5]}", key=f"like_btn_{v[0]}"):
+                    conn.execute("UPDATE videos SET likes = likes + 1 WHERE id = ?", (v[0],))
+                    conn.commit()
+                    st.rerun()
+
+    elif sub_nav == "📚 مكتبتي العلمية":
+        st.header("📚 مكتبتي العلمية المحفوظة")
+        for vid_id in st.session_state.my_library:
+            vi = conn.execute("SELECT * FROM videos WHERE id=?", (vid_id,)).fetchone()
+            if vi:
+                with st.container(border=True):
+                    st.subheader(vi[1]); st.video(vi[2])
+                    if st.button("إزالة", key=f"del_lib_{vi[0]}"):
+                        st.session_state.my_library.remove(vi[0]); st.rerun()
+
+# ==========================================
+# 📊 6. منطقة الناشرين (مع مفاتيح فريدة لكل حقل)
+# ==========================================
+elif st.session_state.page == 'publisher_area':
+    if not st.session_state.logged_in:
+        t1, t2, t3 = st.tabs(["🔑 دخول", "📝 تسجيل", "🔐 استعادة"])
+        with t1:
+            u = st.text_input("اسم المستخدم", key="input_login_u")
+            p = st.text_input("كلمة المرور", type="password", key="input_login_p")
+            if st.button("دخول", key="btn_login_final"):
+                user = conn.execute("SELECT * FROM users WHERE username=? AND password=?", (u, hash_pass(p))).fetchone()
+                if user: st.session_state.logged_in = True; st.session_state.user = u; st.rerun()
+                else: st.error("بيانات خاطئة")
+        with t2:
+            ru = st.text_input("اسم جديد", key="input_reg_u")
+            rp = st.text_input("كلمة سر جديدة", type="password", key="input_reg_p")
+            if st.button("تسجيل الحساب", key="btn_reg_final"):
+                try:
+                    conn.execute("INSERT INTO users VALUES (?,?)", (ru, hash_pass(rp)))
+                    conn.commit(); st.success("تم بنجاح!")
+                except: st.error("الاسم مستخدم")
+        with t3:
+            fu = st.text_input("اسم المستخدم للتحقق", key="input_reset_u")
+            if fu:
+                res = conn.execute("SELECT username FROM users WHERE username=?", (fu,)).fetchone()
+                if res:
+                    np = st.text_input("الباسورد الجديد", type="password", key="input_new_p")
+                    if st.button("تحديث", key="btn_reset_final"):
+                        conn.execute("UPDATE users SET password=? WHERE username=?", (hash_pass(np), fu))
+                        conn.commit(); st.success("تم التحديث!")
+    else:
+        st.subheader(f"لوحة التحكم: {st.session_state.user}")
+        if st.button("🚪 خروج", key="btn_logout_final"):
+            st.session_state.logged_in = False; st.rerun()
+        
+        st.divider()
+        vt = st.text_input("عنوان الفيديو العلمي", key="input_upload_title")
+        vc = st.selectbox("القسم", all_cats[1:], key="select_upload_cat")
+        vf = st.file_uploader("ارفع فيديو MP4", type=["mp4"], key="file_uploader_final")
+        
+        if st.button("نشر الفيديو", key="btn_publish_final"):
+            if vt and vf:
+                if not is_scientific(vt):
+                    st.error("⚠️ مرفوض! العنوان غير علمي.")
+                else:
+                    try:
+                        path = os.path.join(VIDEOS_DIR, vf.name)
+                        with open(path, "wb") as f: f.write(vf.getbuffer())
+                        conn.execute("INSERT INTO videos (title, path, author, category) VALUES (?,?,?,?)", (vt, path, st.session_state.user, vc))
+                        conn.commit(); st.success("✅ تم النشر!")
+                    except: st.error("⚠️ العنوان مكرر!")
 
         sql = "SELECT * FROM videos WHERE 1=1"
         params = []

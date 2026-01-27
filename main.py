@@ -21,7 +21,6 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS videos 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT UNIQUE, path TEXT, 
                   author TEXT, category TEXT, likes INTEGER DEFAULT 0, views INTEGER DEFAULT 0)''')
-    c.execute('CREATE TABLE IF NOT EXISTS comments (v_id INTEGER, user TEXT, text TEXT)')
     conn.commit()
     return conn
 
@@ -31,7 +30,21 @@ def hash_pass(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 # ==========================================
-# 🎨 2. الإعدادات وتصميم الشعار
+# 🛡️ 2. نظام الرقابة (فحص العنوان)
+# ==========================================
+# قائمة الكلمات المحظورة (يمكنك زيادة الكلمات هنا)
+BANNED_WORDS = ["هبل", "شتم", "قذارة", "سياسة", "تحدي", "مقالب", "لعب"] 
+
+def is_scientific(title):
+    # تحويل العنوان لنص صغير للفحص
+    t = title.lower()
+    for word in BANNED_WORDS:
+        if word in t:
+            return False
+    return True
+
+# ==========================================
+# 🎨 3. التصميم (الميكروسكوب في المنتصف)
 # ==========================================
 st.set_page_config(page_title="Science Tube", page_icon="🔬", layout="wide")
 
@@ -44,9 +57,8 @@ st.markdown("""
         box-shadow: 0px 8px 20px rgba(0,0,0,0.4); border: 2px solid #FF0000;
     }
     .logo-text { color: white; font-family: 'Arial Black', sans-serif; font-size: 45px; font-weight: 900; margin: 0; }
-    .micro-img { font-size: 55px; filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5)); }
+    .micro-img { font-size: 55px; }
     </style>
-    
     <div class="main-logo-container">
         <div class="youtube-style-box">
             <span class="logo-text">Science</span>
@@ -56,20 +68,13 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-all_cats = [
-    "الكل", "البرمجة", "علاج طبيعي", "الفيزياء التطبيقية", "الكيمياء", 
-    "الطب", "الفضاء", "الذكاء الاصطناعي", "الروبوتات", "الرياضيات", 
-    "الجيولوجيا", "علم النفس", "تكنولوجيا النانو", "الأحياء البحرية", 
-    "الهندسة", "علم الوراثة", "الأحافير", "الطاقة", "المناخ", 
-    "البرمجيات", "الإلكترونيات", "المنطق", "الكيمياء العضوية", "علوم الأعصاب"
-]
+all_cats = ["الكل", "البرمجة", "علاج طبيعي", "الفيزياء", "الكيمياء", "الطب", "الفضاء"]
 
-if 'viewed_ids' not in st.session_state: st.session_state.viewed_ids = set()
-if 'my_library' not in st.session_state: st.session_state.my_library = []
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user' not in st.session_state: st.session_state.user = "زائر"
 if 'page' not in st.session_state: st.session_state.page = 'home'
 
+# أزرار التنقل
 t_col1, t_col2 = st.columns([5, 1])
 with t_col1:
     if st.button("🏠 الرئيسية"): st.session_state.page = 'home'; st.rerun()
@@ -80,27 +85,49 @@ with t_col2:
 st.divider()
 
 # ==========================================
-# 🏠 3. الصفحة الرئيسية والمكتبة (مع إضافة البحث)
+# 🏠 4. الصفحة الرئيسية (مع مربع البحث)
 # ==========================================
-with st.sidebar:
-    st.title("🧭 التنقل")
-    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"])
-    selected_cat = st.radio("📂 الأقسام:", all_cats)
-
-if st.session_state.page == 'home' and sub_nav == "🏠 الفيديوهات":
-    # --- 🔍 مربع البحث الجديد ---
-    search_query = st.text_input("🔍 ابحث عن فيديو علمي بالاسم...", "")
-
-    # بناء الاستعلام بناءً على القسم والبحث
+if st.session_state.page == 'home':
+    search_q = st.text_input("🔍 ابحث عن فيديو علمي...")
+    
     sql = "SELECT * FROM videos WHERE 1=1"
     params = []
-    if selected_cat != "الكل":
-        sql += " AND category = ?"
-        params.append(selected_cat)
-    if search_query:
+    if search_q:
         sql += " AND title LIKE ?"
-        params.append(f"%{search_query}%")
+        params.append(f"%{search_q}%")
     
+    vids = conn.execute(sql + " ORDER BY id DESC", tuple(params)).fetchall()
+    for v in vids:
+        with st.container(border=True):
+            st.subheader(v[1])
+            st.video(v[2])
+            st.write(f"👁️ {v[6]} مشاهدة | ✍️ الناشر: {v[3]} | 📂 القسم: {v[4]}")
+
+# ==========================================
+# 📊 5. منطقة الناشرين (مع الرقابة الصارمة)
+# ==========================================
+elif st.session_state.page == 'publisher_area':
+    if not st.session_state.logged_in:
+        tab1, tab2, tab3 = st.tabs(["🔑 دخول", "📝 حساب جديد", "🔐 استعادة"])
+        # (أكواد الدخول والتسجيل هنا كما هي في نسختك السابقة)
+    else:
+        st.subheader(f"لوحة التحكم: {st.session_state.user}")
+        v_t = st.text_input("عنوان الفيديو")
+        v_c = st.selectbox("القسم", all_cats[1:])
+        v_f = st.file_uploader("ارفع الفيديو", type=["mp4"])
+        
+        if st.button("فحص ونشر الفيديو"):
+            if v_t and v_f:
+                # --- تفعيل الرقابة هنا ---
+                if not is_scientific(v_t):
+                    st.error("⚠️ مرفوض! العنوان يحتوي على كلمات غير لائقة أو غير علمية.")
+                else:
+                    try:
+                        path = os.path.join(VIDEOS_DIR, v_f.name)
+                        with open(path, "wb") as f: f.write(v_f.getbuffer())
+                        conn.execute("INSERT INTO videos (title, path, author, category) VALUES (?,?,?,?)", (v_t, path, st.session_state.user, v_c))
+                        conn.commit(); st.success("✅ تم الفحص والنشر بنجاح!")
+                    except: st.error("العنوان مكرر!")
     vids = conn.execute(sql + " ORDER BY id DESC", tuple(params)).fetchall()
 
     if not vids:

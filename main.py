@@ -4,12 +4,12 @@ import os
 import hashlib
 
 # ==========================================
-# 💾 1. إعدادات المسارات الديناميكية
+# 💾 1. إعدادات المسارات الديناميكية والقاعدة
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_PATH = os.path.join(BASE_DIR, "ScienceTubeData")
 VIDEOS_DIR = os.path.join(STORAGE_PATH, "videos")
-DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v16.db")
+DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v20.db")
 
 if not os.path.exists(VIDEOS_DIR):
     os.makedirs(VIDEOS_DIR, exist_ok=True)
@@ -31,9 +31,9 @@ def hash_pass(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 # ==========================================
-# 🛡️ 2. نظام الرقابة الصارم
+# 🛡️ 2. نظام الرقابة الصارم (العلمي)
 # ==========================================
-BANNED_WORDS = ["هبل", "مقالب", "تحدي", "سياسة", "شتيمة", "قذارة", "لعب", "مسخرة"]
+BANNED_WORDS = ["هبل", "مقالب", "تحدي", "سياسة", "شتيمة", "قذارة", "لعب", "مسخرة", "تيك توك", "بث مباشر"]
 
 def is_scientific(title):
     t = title.lower()
@@ -74,33 +74,157 @@ all_cats = [
     "البرمجيات", "الإلكترونيات", "المنطق", "الكيمياء العضوية", "علوم الأعصاب"
 ]
 
+# إدارة الجلسات
 if 'viewed_ids' not in st.session_state: st.session_state.viewed_ids = set()
 if 'my_library' not in st.session_state: st.session_state.my_library = []
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user' not in st.session_state: st.session_state.user = "زائر"
 if 'page' not in st.session_state: st.session_state.page = 'home'
 
-# أزرار التنقل
+# أزرار التنقل العلوي
 t_col1, t_col2 = st.columns([5, 1])
 with t_col1:
-    if st.button("🏠 الرئيسية"): st.session_state.page = 'home'; st.rerun()
+    if st.button("🏠 الرئيسية", key="nav_main_home"): 
+        st.session_state.page = 'home'
+        st.rerun()
 with t_col2:
     label = f"🚀 {st.session_state.user}" if st.session_state.logged_in else "👤 منطقة الناشرين"
-    if st.button(label, use_container_width=True): st.session_state.page = 'publisher_area'; st.rerun()
+    if st.button(label, use_container_width=True, key="nav_publisher_btn"): 
+        st.session_state.page = 'publisher_area'
+        st.rerun()
 
 st.divider()
 
 # ==========================================
-# 🏠 4. القائمة الجانبية
+# 🏠 4. القائمة الجانبية (الأقسام + مكتبتي)
 # ==========================================
 with st.sidebar:
     st.title("🧭 التنقل")
-    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"])
-    selected_cat = st.radio("📂 الأقسام العلمية:", all_cats)
+    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"], key="side_nav_radio")
+    selected_cat = st.radio("📂 الأقسام العلمية:", all_cats, key="side_cat_radio")
 
 # ==========================================
-# 🏠 5. المحتوى الرئيسي والبحث (تم التعديل)
+# 🏠 5. المحتوى الرئيسي (البحث والعرض)
 # ==========================================
+if st.session_state.page == 'home':
+    if sub_nav == "🏠 الفيديوهات":
+        search_query = st.text_input("🔍 ابحث عن فيديو علمي...", "", key="search_bar_unique")
+
+        sql = "SELECT * FROM videos WHERE 1=1"
+        params = []
+        if selected_cat != "الكل":
+            sql += " AND category=?"
+            params.append(selected_cat)
+        if search_query:
+            sql += " AND title LIKE ?"
+            params.append(f"%{search_query}%")
+        
+        vids = conn.execute(sql + " ORDER BY id DESC", tuple(params)).fetchall()
+
+        if not vids:
+            st.info("لم يتم العثور على فيديوهات في هذا القسم حالياً.")
+
+        for v in vids:
+            with st.container(border=True):
+                st.subheader(v[1])
+                st.video(v[2])
+                res = conn.execute("SELECT views, likes FROM videos WHERE id=?", (v[0],)).fetchone()
+                st.write(f"👁️ {res[0]} مشاهدة | ✍️ الناشر: {v[3]} | 📂 القسم: {v[4]}")
+                
+                c1, c2, c3 = st.columns(3)
+                if c1.button(f"📚 حفظ في المكتبة", key=f"lib_btn_{v[0]}"):
+                    if v[0] not in st.session_state.my_library: 
+                        st.session_state.my_library.append(v[0])
+                        st.rerun()
+                try:
+                    with open(v[2], "rb") as f:
+                        c2.download_button("💾 حفظ", f, file_name=f"{v[1]}.mp4", key=f"dl_btn_{v[0]}")
+                except: c2.write("الملف غير متوفر")
+                if c3.button(f"❤️ {res[1]}", key=f"like_btn_{v[0]}"):
+                    conn.execute("UPDATE videos SET likes = likes + 1 WHERE id = ?", (v[0],))
+                    conn.commit(); st.rerun()
+
+    elif sub_nav == "📚 مكتبتي العلمية":
+        st.header("📚 مكتبتي العلمية المحفوظة")
+        if not st.session_state.my_library:
+            st.info("مكتبتك فارغة. تصفح الفيديوهات وأضف ما يعجبك!")
+        for vid_id in st.session_state.my_library:
+            vi = conn.execute("SELECT * FROM videos WHERE id=?", (vid_id,)).fetchone()
+            if vi:
+                with st.container(border=True):
+                    st.subheader(vi[1]); st.video(vi[2])
+                    if st.button("إزالة من المكتبة", key=f"rem_lib_{vi[0]}"): 
+                        st.session_state.my_library.remove(vi[0])
+                        st.rerun()
+
+# ==========================================
+# 📊 6. منطقة الناشرين (دخول + تسجيل + استعادة + رفع)
+# ==========================================
+elif st.session_state.page == 'publisher_area':
+    if not st.session_state.logged_in:
+        t1, t2, t3 = st.tabs(["🔑 تسجيل الدخول", "📝 إنشاء حساب", "🔐 استعادة كلمة السر"])
+        
+        with t1:
+            u = st.text_input("اسم المستخدم", key="login_u_field")
+            p = st.text_input("كلمة المرور", type="password", key="login_p_field")
+            if st.button("دخول", key="final_login_btn"):
+                user = conn.execute("SELECT * FROM users WHERE username=? AND password=?", (u, hash_pass(p))).fetchone()
+                if user: st.session_state.logged_in = True; st.session_state.user = u; st.rerun()
+                else: st.error("عذراً، بيانات الدخول غير صحيحة")
+        
+        with t2:
+            reg_u = st.text_input("اختر اسم مستخدم", key="reg_u_field")
+            reg_p = st.text_input("اختر كلمة مرور", type="password", key="reg_p_field")
+            if st.button("تأكيد التسجيل", key="final_reg_btn"):
+                try:
+                    conn.execute("INSERT INTO users (username, password) VALUES (?,?)", (reg_u, hash_pass(reg_p)))
+                    conn.commit(); st.success("تم إنشاء حسابك! يمكنك الآن تسجيل الدخول.")
+                except: st.error("هذا الاسم مستخدم بالفعل، اختر اسماً آخر.")
+        
+        with t3:
+            st.write("### 🔐 هل نسيت كلمة السر؟")
+            f_u = st.text_input("ادخل اسم المستخدم للتحقق", key="reset_u_check")
+            if f_u:
+                user_found = conn.execute("SELECT username FROM users WHERE username=?", (f_u,)).fetchone()
+                if user_found:
+                    st.success(f"تم التحقق من حساب {f_u}")
+                    n_p = st.text_input("كلمة المرور الجديدة", type="password", key="reset_new_p")
+                    if st.button("تحديث الآن", key="final_reset_btn"):
+                        conn.execute("UPDATE users SET password=? WHERE username=?", (hash_pass(n_p), f_u))
+                        conn.commit(); st.success("تم تحديث كلمة المرور بنجاح!")
+                else: st.warning("هذا الاسم غير مسجل لدينا.")
+    
+    else:
+        st.subheader(f"مرحباً بك دكتور {st.session_state.user} 🔬")
+        if st.button("🚪 تسجيل الخروج", key="final_logout_btn"):
+            st.session_state.logged_in = False
+            st.session_state.user = "زائر"
+            st.rerun()
+        
+        st.divider()
+        st.write("### 📤 رفع وفحص فيديو علمي")
+        v_t = st.text_input("عنوان الفيديو", key="upload_v_title")
+        v_c = st.selectbox("تخصص الفيديو", all_cats[1:], key="upload_v_cat")
+        v_f = st.file_uploader("ملف الفيديو (MP4)", type=["mp4"], key="upload_v_file")
+        
+        if st.button("فحص ونشر الآن", key="final_publish_btn"): 
+            if v_t and v_f:
+                if not is_scientific(v_t):
+                    st.error("⚠️ السيستم يرفض هذا العنوان! يرجى الالتزام بمحتوى علمي لائق.")
+                else:
+                    try:
+                        # تنظيف اسم الملف وحفظه
+                        filename = f"{v_t.replace(' ', '_')}_{v_f.name}"
+                        path = os.path.join(VIDEOS_DIR, filename)
+                        with open(path, "wb") as f: f.write(v_f.getbuffer())
+                        
+                        conn.execute("INSERT INTO videos (title, path, author, category) VALUES (?,?,?,?)", 
+                                     (v_t, path, st.session_state.user, v_c))
+                        conn.commit()
+                        st.success("✅ تم النشر بنجاح بعد الفحص!")
+                        st.balloons()
+                    except sqlite3.IntegrityError:
+                        st.error("⚠️ خطأ: هذا العنوان منشور مسبقاً! اختر عنواناً فريداً.")
 if st.session_state.page == 'home' and sub_nav == "🏠 الفيديوهات":
     # تم حذف "بالاسم" من هنا
     search_query = st.text_input("🔍 ابحث عن فيديو علمي...", "")

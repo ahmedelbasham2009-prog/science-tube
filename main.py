@@ -11,11 +11,9 @@ STORAGE_PATH = os.path.join(PROJECT_ROOT, "ScienceTubeData")
 VIDEOS_DIR = os.path.join(STORAGE_PATH, "videos")
 DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v16.db")
 
-# إنشاء مجلدات التخزين
 if not os.path.exists(VIDEOS_DIR):
     os.makedirs(VIDEOS_DIR, exist_ok=True)
 
-# دالة إعداد قاعدة البيانات
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
@@ -33,14 +31,55 @@ def hash_pass(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 # ==========================================
-# 🎨 2. الإعدادات العامة (تغيير الشعار للأيقونة 🔬)
+# 🎨 2. الإعدادات وتصميم الشعار الجديد (YouTube Style)
 # ==========================================
 st.set_page_config(
     page_title="Science Tube",
-    page_icon="🔬",  # هذا هو التعديل لتغيير شعار الموقع
+    page_icon="🔬",
     layout="wide"
 )
 
+# تصميم الشعار بالـ CSS ليظهر في المنتصف
+st.markdown("""
+    <style>
+    .logo-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Arial Black', sans-serif;
+        font-size: 50px;
+        font-weight: bold;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .science-text {
+        color: white;
+    }
+    .tube-text {
+        color: white;
+    }
+    .red-box {
+        background-color: #FF0000;
+        color: white;
+        padding: 5px 20px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+    }
+    </style>
+    
+    <div class="logo-container">
+        <span class="science-text">Science</span>
+        <div class="red-box">
+            <span>🔬</span>
+        </div>
+        <span class="tube-text">Tube</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+# باقي الإعدادات (الأصناف والحالة)
 all_cats = [
     "الكل", "البرمجة", "علاج طبيعي", "الفيزياء التطبيقية", "الكيمياء",
     "الطب", "الفضاء", "الذكاء الاصطناعي", "الروبوتات", "الرياضيات",
@@ -49,14 +88,11 @@ all_cats = [
     "البرمجيات", "الإلكترونيات", "المنطق", "الكيمياء العضوية", "علوم الأعصاب"
 ]
 
-# إدارة الحالة (Session State)
 if 'viewed_ids' not in st.session_state: st.session_state.viewed_ids = set()
 if 'my_library' not in st.session_state: st.session_state.my_library = []
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user' not in st.session_state: st.session_state.user = "زائر"
 if 'page' not in st.session_state: st.session_state.page = 'home'
-
-st.markdown("<h1 style='text-align: center; color: #00ff00;'>🔬 Science Tube</h1>", unsafe_allow_html=True)
 
 # أزرار التنقل العلوي
 t_col1, t_col2 = st.columns([5, 1])
@@ -79,7 +115,6 @@ with st.sidebar:
     st.title("🧭 التنقل")
     sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"])
     selected_cat = st.radio("📂 الأقسام:", all_cats)
-    st.info("نظام النشر العلمي الأول")
 
 if st.session_state.page == 'home' and sub_nav == "🏠 الفيديوهات":
     query = "SELECT * FROM videos"
@@ -152,7 +187,7 @@ elif sub_nav == "📚 مكتبتي العلمية":
                     st.rerun()
 
 # ==========================================
-# 📊 4. منطقة الناشرين (منع التكرار)
+# 📊 4. منطقة الناشرين
 # ==========================================
 elif st.session_state.page == 'publisher_area':
     if not st.session_state.logged_in:
@@ -171,14 +206,13 @@ elif st.session_state.page == 'publisher_area':
             reg_p = st.text_input("كلمة مرور قوية", type="password", key="r_p")
             if st.button("إنشاء الحساب"):
                 if reg_u and reg_p:
-                    # تعديل: منع تكرار اسم المستخدم
                     check_u = conn.execute("SELECT username FROM users WHERE username=?", (reg_u,)).fetchone()
                     if check_u:
-                        st.error("⚠️ اسم المستخدم هذا مستخدم بالفعل، جرب اسماً آخر.")
+                        st.error("⚠️ اسم المستخدم هذا مستخدم بالفعل")
                     else:
                         conn.execute("INSERT INTO users VALUES (?,?)", (reg_u, hash_pass(reg_p)))
                         conn.commit()
-                        st.success("✅ تم التسجيل بنجاح! يمكنك الدخول الآن.")
+                        st.success("✅ تم التسجيل بنجاح!")
                 else:
                     st.warning("يرجى إكمال جميع الخانات.")
         with tab3:
@@ -207,10 +241,9 @@ elif st.session_state.page == 'publisher_area':
 
         if st.button("نشر الآن"):
             if v_t and v_f:
-                # تعديل: منع تكرار الفيديو بنفس العنوان
                 check_v = conn.execute("SELECT title FROM videos WHERE title=?", (v_t,)).fetchone()
                 if check_v:
-                    st.error("⚠️ فيديو بهذا العنوان موجود بالفعل، يرجى اختيار عنوان مختلف.")
+                    st.error("⚠️ فيديو بهذا العنوان موجود بالفعل")
                 else:
                     video_filename = f"{hashlib.md5(v_f.name.encode()).hexdigest()}_{v_f.name}"
                     path = os.path.join(VIDEOS_DIR, video_filename)

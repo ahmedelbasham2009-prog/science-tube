@@ -1,15 +1,27 @@
 import streamlit as st
 import sqlite3
 import os
+import hashlib
 
-# --- 1. إعداد المجلدات وقاعدة البيانات ---
-if not os.path.exists("science_videos_storage"):
-    os.makedirs("science_videos_storage")
+# ==========================================
+# 💾 1. إعدادات المسارات الديناميكية (للنشر العالمي)
+# ==========================================
+# سيقوم الكود بإنشاء مجلد البيانات في نفس مكان وجود الملف البرمجي
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+STORAGE_PATH = os.path.join(PROJECT_ROOT, "ScienceTubeData")
+VIDEOS_DIR = os.path.join(STORAGE_PATH, "videos")
+DB_PATH = os.path.join(STORAGE_PATH, "science_tube_v16.db")
+
+# إنشاء المجلدات إذا لم تكن موجودة
+if not os.path.exists(VIDEOS_DIR):
+    os.makedirs(VIDEOS_DIR, exist_ok=True)
 
 
+# دالة إعداد قاعدة البيانات
 def init_db():
-    conn = sqlite3.connect('science_tube_final.db')
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)')
     c.execute('''CREATE TABLE IF NOT EXISTS videos
                  (
                      id
@@ -19,112 +31,212 @@ def init_db():
                      AUTOINCREMENT,
                      title
                      TEXT,
+                     path
+                     TEXT,
+                     author
+                     TEXT,
                      category
                      TEXT,
-                     file_path
-                     TEXT
+                     likes
+                     INTEGER
+                     DEFAULT
+                     0,
+                     views
+                     INTEGER
+                     DEFAULT
+                     0
                  )''')
+    c.execute('CREATE TABLE IF NOT EXISTS comments (v_id INTEGER, user TEXT, text TEXT)')
     conn.commit()
     return conn
 
 
 conn = init_db()
 
-# --- 2. قائمة الأقسام العلمية (المحدثة) ---
-SCIENTIFIC_SECTIONS = [
-    "البرمجة", "العلاج الطبيعي", "الفضاء والفلك", "الذكاء الاصطناعي",
-    "الطب البشري", "الجراحة", "الهندسة المدنية", "الهندسة الكهربائية",
-    "الكيمياء العضوية", "الكيمياء التحليلية", "الرياضيات",
-    "الفيزياء النظرية", "علوم البحار", "الأمن السيبراني",
-    "الروبوتات", "التقنية الحيوية", "علم النفس",
-    "الاقتصاد", "علوم البيئة", "الطاقة المتجددة",
-    "الجيولوجيا", "علم الآثار", "اللغويات",
-    "علوم النانو", "علم الوراثة"
+
+def hash_pass(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
+
+
+# ==========================================
+# 🎨 2. الإعدادات العامة والواجهة
+# ==========================================
+all_cats = [
+    "الكل", "البرمجة", "علاج طبيعي", "الفيزياء التطبيقية", "الكيمياء",
+    "الطب", "الفضاء", "الذكاء الاصطناعي", "الروبوتات", "الرياضيات",
+    "الجيولوجيا", "علم النفس", "تكنولوجيا النانو", "الأحياء البحرية",
+    "الهندسة", "علم الوراثة", "الأحافير", "الطاقة", "المناخ",
+    "البرمجيات", "الإلكترونيات", "المنطق", "الكيمياء العضوية", "علوم الأعصاب"
 ]
 
-# --- 3. تصميم الواجهة (Science Tube Design) ---
-st.set_page_config(page_title="Science Tube", layout="wide", page_icon="🧪")
+if 'viewed_ids' not in st.session_state: st.session_state.viewed_ids = set()
+if 'my_library' not in st.session_state: st.session_state.my_library = []
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'user' not in st.session_state: st.session_state.user = "زائر"
+if 'page' not in st.session_state: st.session_state.page = 'home'
 
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; flex-wrap: wrap; background-color: #161b22; padding: 12px; border-radius: 12px; }
-    .stTabs [data-baseweb="tab"] { background-color: #21262d; border-radius: 6px; color: #c9d1d9; padding: 6px 10px; }
-    .stTabs [aria-selected="true"] { background-color: #e91e63 !important; color: white !important; }
-    .video-card { border: 1px solid #30363d; padding: 20px; border-radius: 15px; background-color: #1c2128; margin-bottom: 25px; }
-    h1, h2 { color: #e91e63; text-align: center; }
-    </style>
-    """, unsafe_allow_html=True)
+st.set_page_config(page_title="Science Tube", layout="wide")
 
-# --- 4. القائمة الجانبية ---
-st.sidebar.title("🧪 Science Tube")
-choice = st.sidebar.radio("القائمة", ["🏠 تصفح الأقسام", "📤 رفع فيديو جديد", "🛠️ إدارة المحتوى (حذف)"])
+st.markdown("<h1 style='text-align: center; color: #00ff00;'>🔬 Science Tube</h1>", unsafe_allow_html=True)
 
-# --- 5. صفحة تصفح الأقسام ---
-if choice == "🏠 تصفح الأقسام":
-    st.title("🧪 Science Tube")
-    tabs = st.tabs(SCIENTIFIC_SECTIONS)
-    for i, cat in enumerate(SCIENTIFIC_SECTIONS):
-        with tabs[i]:
-            vids = conn.execute("SELECT title, file_path FROM videos WHERE category = ?", (cat,)).fetchall()
-            if not vids:
-                st.info(f"قسم {cat} بانتظار مساهماتكم.")
+# أزرار التنقل العلوي
+t_col1, t_col2 = st.columns([5, 1])
+with t_col1:
+    if st.button("🏠 الرئيسية"):
+        st.session_state.page = 'home'
+        st.rerun()
+with t_col2:
+    label = f"🚀 {st.session_state.user}" if st.session_state.logged_in else "👤 منطقة الناشرين"
+    if st.button(label, use_container_width=True):
+        st.session_state.page = 'publisher_area'
+        st.rerun()
+
+st.divider()
+
+# ==========================================
+# 🏠 3. الصفحة الرئيسية والمكتبة
+# ==========================================
+with st.sidebar:
+    st.title("🧭 التنقل")
+    sub_nav = st.radio("القائمة:", ["🏠 الفيديوهات", "📚 مكتبتي العلمية"])
+    selected_cat = st.radio("📂 الأقسام:", all_cats)
+
+if st.session_state.page == 'home' and sub_nav == "🏠 الفيديوهات":
+    query = "SELECT * FROM videos"
+    params = ()
+    if selected_cat != "الكل":
+        query += " WHERE category=?"
+        params = (selected_cat,)
+
+    vids = conn.execute(query + " ORDER BY id DESC", params).fetchall()
+
+    if not vids:
+        st.info("لا توجد فيديوهات في هذا القسم حالياً.")
+
+    for v in vids:
+        with st.container(border=True):
+            st.subheader(v[1])
+            # زيادة المشاهدات
+            if v[0] not in st.session_state.viewed_ids:
+                conn.execute("UPDATE videos SET views = views + 1 WHERE id = ?", (v[0],))
+                conn.commit()
+                st.session_state.viewed_ids.add(v[0])
+
+            # عرض الفيديو
+            if os.path.exists(v[2]):
+                st.video(v[2])
             else:
-                cols = st.columns(2)
-                for idx, vid in enumerate(vids):
-                    with cols[idx % 2]:
-                        st.markdown('<div class="video-card">', unsafe_allow_html=True)
-                        st.subheader(f"🎬 {vid[0]}")
-                        st.video(vid[1])
-                        st.markdown('</div>', unsafe_allow_html=True)
+                st.error("ملف الفيديو غير موجود على الخادم.")
 
-# --- 6. صفحة رفع الفيديو ---
-elif choice == "📤 رفع فيديو جديد":
-    st.title("📤 إضافة فيديو إلى Science Tube")
-    with st.form("upload_form"):
-        v_title = st.text_input("عنوان الفيديو")
-        v_cat = st.selectbox("اختر القسم العلمي", SCIENTIFIC_SECTIONS)
-        v_file = st.file_uploader("اختر ملف الفيديو", type=["mp4", "mov"])
-        if st.form_submit_button("🚀 فحص و نشر الفيديو"):
-            if v_title and v_file:
-                # منطق الرقابة البسيط
-                science_keywords = ["برمج", "كود", "علاج", "طبيعي", "جسم", "طب", "فضاء", "علم", "هندسة", "كيمياء",
-                                    "رياضيات"]
-                if any(word in v_title.lower() for word in science_keywords):
-                    file_path = os.path.join("science_videos_storage", v_file.name)
-                    with open(file_path, "wb") as f:
-                        f.write(v_file.getbuffer())
-                    conn.execute("INSERT INTO videos (title, category, file_path) VALUES (?,?,?)",
-                                 (v_title, v_cat, file_path))
-                    conn.commit()
-                    st.success("✅ تم النشر بنجاح!")
-                    st.balloons()
-                else:
-                    st.error("❌ مرفوض: العنوان يجب أن يحتوي على مصطلحات علمية تخصصية.")
-            else:
-                st.warning("يرجى إكمال البيانات.")
+            res = conn.execute("SELECT views, likes FROM videos WHERE id=?", (v[0],)).fetchone()
+            st.markdown(f"**👁️ المشاهدات:** {res[0]} | **✍️ الناشر:** {v[3]} | **📂 القسم:** {v[4]}")
 
-# --- 7. صفحة الحذف ---
-elif choice == "🛠️ إدارة المحتوى (حذف)":
-    st.title("🛠️ إدارة فيديوهات Science Tube")
-    password = st.sidebar.text_input("أدخل كلمة مرور الإدارة للحذف", type="password")
+            c1, c2, c3 = st.columns(3)
+            if c1.button(f"📚 حفظ في المكتبة", key=f"lib_{v[0]}"):
+                if v[0] not in st.session_state.my_library:
+                    st.session_state.my_library.append(v[0])
+                    st.toast("تمت الإضافة للمكتبة")
 
-    if password == "1234":  # يمكنك تغيير كلمة المرور هنا
-        all_vids = conn.execute("SELECT id, title, category, file_path FROM videos").fetchall()
-        if not all_vids:
-            st.info("لا توجد فيديوهات مسجلة.")
-        else:
-            for vid_id, title, cat, path in all_vids:
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.write(f"**{title}** ({cat})")
-                with col2:
-                    if st.button(f"🗑️ حذف", key=f"del_{vid_id}"):
-                        if os.path.exists(path):
-                            os.remove(path)
-                        conn.execute("DELETE FROM videos WHERE id = ?", (vid_id,))
+            try:
+                with open(v[2], "rb") as f:
+                    c2.download_button("💾 تحميل الفيديو", f, file_name=f"{v[1]}.mp4", key=f"dl_{v[0]}")
+            except:
+                pass
+
+            if c3.button(f"❤️ {res[1]} أعجبني", key=f"lk_{v[0]}"):
+                conn.execute("UPDATE videos SET likes = likes + 1 WHERE id = ?", (v[0],))
+                conn.commit()
+                st.rerun()
+
+            with st.expander("💬 التعليقات"):
+                comments = conn.execute("SELECT user, text FROM comments WHERE v_id = ?", (v[0],)).fetchall()
+                for cm in comments: st.markdown(f"**👤 {cm[0]}:** {cm[1]}")
+                new_comm = st.text_input("أضف تعليقك...", key=f"in_{v[0]}")
+                if st.button("نشر التعليق", key=f"btn_{v[0]}"):
+                    if new_comm:
+                        conn.execute("INSERT INTO comments (v_id, user, text) VALUES (?,?,?)",
+                                     (v[0], st.session_state.user, new_comm))
                         conn.commit()
-                        st.success("تم الحذف!")
                         st.rerun()
+
+elif sub_nav == "📚 مكتبتي العلمية":
+    st.header("📚 فيديوهاتي المحفوظة")
+    if not st.session_state.my_library:
+        st.write("مكتبتك فارغة حالياً.")
+    for vid_id in st.session_state.my_library:
+        vi = conn.execute("SELECT * FROM videos WHERE id=?", (vid_id,)).fetchone()
+        if vi:
+            with st.container(border=True):
+                st.subheader(vi[1])
+                st.video(vi[2])
+                if st.button("إزالة من المكتبة", key=f"rem_{vi[0]}"):
+                    st.session_state.my_library.remove(vi[0])
+                    st.rerun()
+
+# ==========================================
+# 📊 4. منطقة الناشرين
+# ==========================================
+elif st.session_state.page == 'publisher_area':
+    if not st.session_state.logged_in:
+        tab1, tab2, tab3 = st.tabs(["🔑 تسجيل الدخول", "📝 إنشاء حساب", "🔐 نسيت كلمة السر"])
+        with tab1:
+            u = st.text_input("اسم المستخدم", key="l_u")
+            p = st.text_input("كلمة المرور", type="password", key="l_p")
+            if st.button("دخول"):
+                user = conn.execute("SELECT * FROM users WHERE username=? AND password=?", (u, hash_pass(p))).fetchone()
+                if user:
+                    st.session_state.logged_in = True;
+                    st.session_state.user = u;
+                    st.rerun()
+                else:
+                    st.error("خطأ في اسم المستخدم أو كلمة المرور")
+        with tab2:
+            reg_u = st.text_input("اسم مستخدم جديد", key="r_u")
+            reg_p = st.text_input("كلمة مرور جديدة", type="password", key="r_p")
+            if st.button("تأكيد التسجيل"):
+                if reg_u and reg_p:
+                    try:
+                        conn.execute("INSERT INTO users VALUES (?,?)", (reg_u, hash_pass(reg_p)))
+                        conn.commit()
+                        st.success("تم إنشاء الحساب! يمكنك الآن تسجيل الدخول.")
+                    except:
+                        st.error("اسم المستخدم مسجل مسبقاً")
+        with tab3:
+            f_u = st.text_input("أدخل اسم المستخدم للتحقق")
+            if f_u:
+                if conn.execute("SELECT username FROM users WHERE username=?", (f_u,)).fetchone():
+                    n_p = st.text_input("كلمة السر الجديدة", type="password")
+                    if st.button("تحديث"):
+                        conn.execute("UPDATE users SET password=? WHERE username=?", (hash_pass(n_p), f_u))
+                        conn.commit()
+                        st.success("تم التحديث!")
+                else:
+                    st.warning("الحساب غير موجود")
     else:
-        st.error("يرجى إدخال كلمة المرور الصحيحة في القائمة الجانبية لتتمكن من الحذف.")
+        st.subheader(f"مرحباً بك: {st.session_state.user}")
+        if st.button("🚪 تسجيل الخروج"):
+            st.session_state.logged_in = False
+            st.session_state.user = "زائر"
+            st.rerun()
+
+        st.divider()
+        st.write("### 📤 رفع فيديو علمي جديد")
+        v_t = st.text_input("عنوان الفيديو")
+        v_c = st.selectbox("القسم العلمي", all_cats[1:])
+        v_f = st.file_uploader("اختر ملف الفيديو", type=["mp4"])
+
+        if st.button("نشر الفيديو"):
+            if v_t and v_f:
+                # حفظ الملف فعلياً في مجلد الفيديوهات
+                video_filename = f"{hashlib.md5(v_f.name.encode()).hexdigest()}_{v_f.name}"
+                path = os.path.join(VIDEOS_DIR, video_filename)
+                with open(path, "wb") as f:
+                    f.write(v_f.getbuffer())
+
+                conn.execute("INSERT INTO videos (title, path, author, category) VALUES (?,?,?,?)",
+                             (v_t, path, st.session_state.user, v_c))
+                conn.commit()
+                st.success("تم رفع ونشر الفيديو بنجاح!")
+                st.rerun()
+            else:
+                st.warning("يرجى ملء جميع البيانات واختيار ملف.")
